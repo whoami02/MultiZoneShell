@@ -4,7 +4,9 @@ obj/
 
 # Published / packaged deployment
 publish/
+installer/
 *.zip
+*.exe
 
 # Visual Studio / Rider
 .vs/
