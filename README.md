@@ -4,6 +4,7 @@ A fullscreen WPF shell that splits one display into independently resizable zone
 
 ## What's new in v1.1.0
 
+- **Netflix-style setup wizard** — on launch, pick what plays in each zone: website, video, image folder, document (PPT / PDF / any file), or application. Saved back to `zones.json`; re-open anytime with `Ctrl+Alt+S`.
 - **Secondary display support** — `"Display": 1` opens the shell on the monitor you choose (0 = primary).
 - **Photo-album Presentation mode** (`Ctrl+Alt+P`) — auto-rotates focus across zones for billboards/live demos (`spotlight` / `column` / `revolve`).
 - **macOS Split View** — pill dividers with magnetic snapping (25% / 33% / 50% / 67% / 75%), a 4-way center handle, double-click to reset 50/50.
@@ -65,6 +66,7 @@ Top-level options:
 | `Topmost` | false | Keep window above others |
 | `Fullscreen` | false | Start borderless fullscreen |
 | `ZoneHeaders` | true | Show per-zone header bars |
+| `Setup` | false | Show the zone setup wizard on launch |
 
 Example:
 ```json
@@ -86,6 +88,7 @@ Clicking any zone makes it active. Hotkeys are global because a focused zone swa
 | `video` | file path, `rtsp://`, `http://`, `udp://` | `Loop`, `Muted`, `NetworkCachingMs` |
 | `image` | image file or folder | `SlideSeconds` |
 | `exe` | path to .exe | `Args`, `ProcessName`, `WindowTitleContains`, `StartupTimeoutSeconds`, `RestartOnExit`, `KillOnShellExit`, `Fit` |
+| `file` | any document (`.ppt`, `.pptx`, `.pdf`, `.docx`, `.xlsx`, …) | opened by the default app and embedded |
 
 Every zone also accepts `Row`, `Col`, `RowSpan` and `ColSpan` for custom layouts. For example, 1 big + 3 small on a 3×3 grid:
 ```json
