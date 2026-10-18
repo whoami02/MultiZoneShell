@@ -1,0 +1,23 @@
+# Build output
+bin/
+obj/
+
+# Published / packaged deployment
+publish/
+*.zip
+
+# Visual Studio / Rider
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# NuGet
+*.nupkg
+*.snupkg
+
+# Logs / temp
+*.log
+*.tmp
+~$*
