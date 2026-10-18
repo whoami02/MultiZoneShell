@@ -248,16 +248,18 @@ internal static class NativeMethods
         return (int)pid;
     }
 
-    /// <summary>First visible, unowned, reasonably sized top-level window owned by one of the PIDs.</summary>
+    /// <summary>First visible, unowned, reasonably sized top-level window owned by one of the PIDs.
+    /// When no PIDs are known but a title is given (shell-launched documents), falls back to a title-only search.</summary>
     public static IntPtr FindMainWindow(ISet<int> pids, string? titleContains)
     {
-        if (pids.Count == 0) return IntPtr.Zero;
+        bool titleOnly = pids.Count == 0 && !string.IsNullOrWhiteSpace(titleContains);
+        if (pids.Count == 0 && !titleOnly) return IntPtr.Zero;
 
         IntPtr found = IntPtr.Zero;
         EnumWindows((h, _) =>
         {
             if (!IsWindowVisible(h) || GetWindow(h, GW_OWNER) != IntPtr.Zero) return true;
-            if (!pids.Contains(GetProcessId(h))) return true;
+            if (!titleOnly && !pids.Contains(GetProcessId(h))) return true;
             if (!GetWindowRect(h, out var r) || r.Right - r.Left < 50 || r.Bottom - r.Top < 50) return true;
             if (!string.IsNullOrWhiteSpace(titleContains) &&
                 !GetTitle(h).Contains(titleContains, StringComparison.OrdinalIgnoreCase)) return true;

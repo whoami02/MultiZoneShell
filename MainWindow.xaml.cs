@@ -10,6 +10,7 @@ using Microsoft.Win32;
 using MultiZoneShell.Config;
 using MultiZoneShell.Infrastructure;
 using MultiZoneShell.Interop;
+using MultiZoneShell.Setup;
 using MultiZoneShell.Zones;
 
 namespace MultiZoneShell;
@@ -31,6 +32,7 @@ public partial class MainWindow : Window
     private const int HkZoomReset = 110;   // Ctrl+Alt+Home
     private const int HkColumn = 111;      // Ctrl+Alt+L (Wayland 1+3 column focus)
     private const int HkPresentation = 112;// Ctrl+Alt+P (auto-rotating presentation)
+    private const int HkSetup = 113;        // Ctrl+Alt+S (reconfigure zones)
 
     // Custom system-menu command id (must be below 0xF000 with the low 4 bits clear).
     private const uint SysMenuFullscreen = 0x1000;
@@ -164,6 +166,16 @@ public partial class MainWindow : Window
                     TextWrapping = TextWrapping.Wrap
                 });
                 return;
+            }
+
+            if (_cfg.Setup || _cfg.Zones.Count == 0)
+            {
+                if (!RunSetup(_cfg))
+                {
+                    Application.Current.Shutdown();
+                    return;
+                }
+                ShellConfig.Save(App.ConfigPath, _cfg);
             }
 
             Topmost = _cfg.Topmost;
@@ -862,6 +874,38 @@ public partial class MainWindow : Window
         await BuildAsync();
     }
 
+    // Show the Netflix-style setup wizard; returns false if the operator cancelled.
+    private bool RunSetup(ShellConfig cfg)
+    {
+        int count = cfg.Zones.Count > 0 ? cfg.Zones.Count : Math.Clamp(cfg.Rows * cfg.Cols, 1, 9);
+        var setup = new SetupWindow(count) { Owner = this };
+        if (setup.ShowDialog() == true && setup.SelectedZones is { Count: > 0 })
+        {
+            cfg.Zones = setup.SelectedZones;
+            cfg.Setup = false;
+            return true;
+        }
+        return false;
+    }
+
+    private async Task ReconfigureAsync()
+    {
+        if (_building) return;
+        _presentationActive = false;
+        _presentationTimer?.Stop();
+
+        int count = _cfg.Zones.Count > 0 ? _cfg.Zones.Count : Math.Clamp(_cfg.Rows * _cfg.Cols, 1, 9);
+        var setup = new SetupWindow(count) { Owner = this };
+        if (setup.ShowDialog() == true && setup.SelectedZones is { Count: > 0 })
+        {
+            _cfg.Zones = setup.SelectedZones;
+            _cfg.Setup = false;
+            ShellConfig.Save(App.ConfigPath, _cfg);
+            DisposeZones();
+            await BuildAsync();
+        }
+    }
+
     // ---------------- Active zone / focus & Global Pan/Zoom ----------------
 
     private void SetActive(int index, bool focus)
@@ -1077,6 +1121,7 @@ public partial class MainWindow : Window
         AddDockButton("Clean Wall", "Show/Hide macOS window headers (Ctrl+Alt+H)", ToggleZoneHeaders);
         AddDockButton("Full Screen", "Toggle borderless fullscreen (Ctrl+Alt+F)", () => SetFullscreen(!_fullscreen));
         AddDockButton("Presentation", "Auto-rotate focus across zones like a photo album (Ctrl+Alt+P)", TogglePresentation);
+        AddDockButton("Setup", "Reconfigure what plays in each zone (Ctrl+Alt+S)", () => _ = ReconfigureAsync());
 
         void AddDockButton(string label, string tooltip, Action onClick)
         {
@@ -1237,6 +1282,7 @@ public partial class MainWindow : Window
         Register(HkZoomReset, mods, NativeMethods.VK_HOME);
         Register(HkColumn, mods, 'L');
         Register(HkPresentation, mods, 'P');
+        Register(HkSetup, mods, 'S');
 
         void Register(int id, uint m, uint vk)
         {
@@ -1249,7 +1295,7 @@ public partial class MainWindow : Window
     {
         if (_hwnd == IntPtr.Zero) return;
         for (int i = 0; i < 9; i++) NativeMethods.UnregisterHotKey(_hwnd, HkZoneBase + i);
-        foreach (var id in new[] { HkMaximize, HkAudio, HkMuteAll, HkReload, HkQuit, HkFullscreen, HkHeaders, HkDock, HkZoomIn, HkZoomOut, HkZoomReset, HkColumn, HkPresentation })
+        foreach (var id in new[] { HkMaximize, HkAudio, HkMuteAll, HkReload, HkQuit, HkFullscreen, HkHeaders, HkDock, HkZoomIn, HkZoomOut, HkZoomReset, HkColumn, HkPresentation, HkSetup })
             NativeMethods.UnregisterHotKey(_hwnd, id);
     }
 
@@ -1294,6 +1340,7 @@ public partial class MainWindow : Window
             case HkZoomReset: ActiveZone()?.ZoneContent?.ResetView(); break;
             case HkColumn: ToggleColumnFocus(); break;
             case HkPresentation: TogglePresentation(); break;
+            case HkSetup: _ = ReconfigureAsync(); break;
             default: handled = false; break;
         }
 

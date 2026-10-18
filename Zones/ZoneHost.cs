@@ -32,8 +32,21 @@ public static class ZoneFactory
         "video" => new VideoZone(cfg),
         "image" => new ImageZone(cfg),
         "exe" => new ExeZone(cfg),
-        _ => throw new NotSupportedException($"Unknown zone type '{cfg.Type}'. Use web | video | image | exe.")
+        "file" => CreateFileZone(cfg),
+        _ => throw new NotSupportedException($"Unknown zone type '{cfg.Type}'. Use web | video | image | exe | file.")
     };
+
+    // A document / anything-opened-by-the-shell (pdf, ppt, docx, ...) is just an exe zone
+    // launched via the shell default handler, matched to its window by the file name.
+    private static IZoneContent CreateFileZone(ZoneConfig cfg)
+    {
+        if (string.IsNullOrWhiteSpace(cfg.WindowTitleContains))
+        {
+            string name = Path.GetFileName(cfg.Source);
+            if (!string.IsNullOrEmpty(name)) cfg.WindowTitleContains = name;
+        }
+        return new ExeZone(cfg);
+    }
 }
 
 /// <summary>
