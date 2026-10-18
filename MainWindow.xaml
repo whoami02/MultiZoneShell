@@ -1,0 +1,35 @@
+<Window x:Class="MultiZoneShell.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MultiZoneShell"
+        WindowStyle="SingleBorderWindow"
+        ResizeMode="CanResize"
+        WindowState="Maximized"
+        Width="1280" Height="800"
+        MinWidth="640" MinHeight="420"
+        WindowStartupLocation="CenterScreen"
+        Background="#000000">
+    <Grid x:Name="RootContainer" Background="#000000">
+        <Grid x:Name="ZoneGrid" Margin="4" />
+
+        <!-- macOS Floating Dock (Popup HWND so it floats cleanly above native WebView2/VLC/Exe HWNDs) -->
+        <Popup x:Name="MacDockPopup"
+               AllowsTransparency="True"
+               PlacementTarget="{Binding ElementName=RootContainer}"
+               Placement="Bottom"
+               HorizontalOffset="0"
+               VerticalOffset="-68"
+               StaysOpen="True"
+               PopupAnimation="Fade">
+            <Border x:Name="MacDockBorder"
+                    Background="#EB1C1C1E"
+                    BorderBrush="#55636366"
+                    BorderThickness="1"
+                    CornerRadius="18"
+                    Padding="12,8"
+                    Margin="8">
+                <StackPanel x:Name="MacDockStrip" Orientation="Horizontal" VerticalAlignment="Center" />
+            </Border>
+        </Popup>
+    </Grid>
+</Window>
