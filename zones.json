@@ -1,0 +1,39 @@
+{
+  "Rows": 2,
+  "Cols": 2,
+  "ZoneBorder": 0,
+  "Topmost": false,
+  "Fullscreen": false,
+  "ZoneHeaders": false,
+
+  "Zones": [
+    {
+      "Type": "exe",
+      "Source": "explorer.exe",
+      "Args": "shell:AppsFolder\\Self-Servef-919a-d3a1f14282b6_tfve5wksz64c2!App",
+      "ProcessName": "Self_Serve",
+      "WindowTitleContains": "",
+      "StartupTimeoutSeconds": 30,
+      "RestartOnExit": false,
+      "KillOnShellExit": true
+    },
+    {
+      "Type": "video",
+      "Source": "D:\\maini_vd1.mp4",
+      "Loop": true,
+      "Muted": true
+    },
+    {
+      "Type": "web",
+      "Source": "https://autoballooning.amg-iot.com/",
+      "Muted": true,
+      "RefreshSeconds": 0
+    },
+    {
+      "Type": "video",
+      "Source": "D:\\Media\\Videos\\HomepageVideo1.mp4",
+      "Loop": true,
+      "Muted": true
+    }
+  ]
+}
