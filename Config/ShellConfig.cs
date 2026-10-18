@@ -14,6 +14,8 @@ public sealed class ShellConfig
     public int Display { get; set; }
     /// <summary>Header bar per zone with its name and a maximize/restore button.</summary>
     public bool ZoneHeaders { get; set; } = true;
+    /// <summary>Auto-rotating "photo album" presentation mode (billboards / live demos).</summary>
+    public PresentationConfig Presentation { get; set; } = new();
     public List<ZoneConfig> Zones { get; set; } = new();
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -36,6 +38,22 @@ public sealed class ShellConfig
 
         return cfg;
     }
+}
+
+public sealed class PresentationConfig
+{
+    /// <summary>Master switch for attract/billboard mode (also toggled with Ctrl+Alt+P).</summary>
+    public bool Enabled { get; set; }
+    /// <summary>spotlight (70/30 emphasis) | column (full-height left) | revolve (fullscreen cycle).</summary>
+    public string Mode { get; set; } = "spotlight";
+    /// <summary>Seconds each pane holds the spotlight before advancing.</summary>
+    public int IntervalSeconds { get; set; } = 15;
+    /// <summary>Auto-start after this many seconds of inactivity (0 = only manual Ctrl+Alt+P).</summary>
+    public int IdleSeconds { get; set; } = 30;
+    /// <summary>sequential | random.</summary>
+    public string Order { get; set; } = "sequential";
+    /// <summary>Pause the show the moment the operator touches the mouse or keyboard.</summary>
+    public bool PauseOnInteraction { get; set; } = true;
 }
 
 public sealed class ZoneConfig

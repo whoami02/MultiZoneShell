@@ -30,6 +30,7 @@ public partial class MainWindow : Window
     private const int HkZoomOut = 109;     // Ctrl+Alt+Minus
     private const int HkZoomReset = 110;   // Ctrl+Alt+Home
     private const int HkColumn = 111;      // Ctrl+Alt+L (Wayland 1+3 column focus)
+    private const int HkPresentation = 112;// Ctrl+Alt+P (auto-rotating presentation)
 
     // Custom system-menu command id (must be below 0xF000 with the low 4 bits clear).
     private const uint SysMenuFullscreen = 0x1000;
@@ -46,6 +47,11 @@ public partial class MainWindow : Window
     private HwndSource? _source;
     private GlobalMouseHook? _mouseHook;
     private DispatcherTimer? _dockHideTimer;
+    private DispatcherTimer? _presentationTimer;
+    private DispatcherTimer? _idleTimer;
+    private DateTime _lastInput = DateTime.UtcNow;
+    private int _presentationIdx = -1;
+    private bool _presentationActive;
     private int _active = -1;
     private bool _maximized;
     private bool _building;
@@ -119,11 +125,14 @@ public partial class MainWindow : Window
 
         NativeMethods.KeepDisplayOn();
         await BuildAsync();
+        StartPresentationWatcher();
     }
 
     private void OnClosed(object? sender, EventArgs e)
     {
         _dockHideTimer?.Stop();
+        _presentationTimer?.Stop();
+        _idleTimer?.Stop();
         MacDockPopup.IsOpen = false;
         UnregisterHotkeys();
         _mouseHook?.Dispose();
@@ -312,6 +321,109 @@ public partial class MainWindow : Window
         _columnMode = !_columnMode;
         RebuildLayout();
         SetActive(_active, focus: true);
+    }
+
+    // ---------------- Presentation (photo-album / attract mode) ----------------
+
+    private void StartPresentationWatcher()
+    {
+        _idleTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _idleTimer.Tick += (_, _) =>
+        {
+            if (_presentationActive || !_cfg.Presentation.Enabled || _cfg.Presentation.IdleSeconds <= 0) return;
+            if ((DateTime.UtcNow - _lastInput).TotalSeconds >= _cfg.Presentation.IdleSeconds)
+                StartPresentation();
+        };
+        _idleTimer.Start();
+    }
+
+    private void TogglePresentation()
+    {
+        if (!_cfg.Presentation.Enabled || _zones.Count == 0) return;
+        if (_presentationActive) StopPresentation();
+        else StartPresentation();
+    }
+
+    private void StartPresentation()
+    {
+        if (_presentationActive || _zones.Count == 0) return;
+        _presentationActive = true;
+        _presentationIdx = -1;
+
+        int secs = Math.Max(3, _cfg.Presentation.IntervalSeconds);
+        _presentationTimer ??= new DispatcherTimer();
+        _presentationTimer.Interval = TimeSpan.FromSeconds(secs);
+        _presentationTimer.Tick -= OnPresentationTick;
+        _presentationTimer.Tick += OnPresentationTick;
+        _presentationTimer.Start();
+
+        AdvancePresentation();
+        Log.Info($"Presentation mode started ({_cfg.Presentation.Mode}, {secs}s interval).");
+    }
+
+    private void StopPresentation()
+    {
+        if (!_presentationActive) return;
+        _presentationActive = false;
+        _presentationTimer?.Stop();
+
+        if (_maximized) ToggleMaximize();
+        if (_columnMode) { _columnMode = false; RebuildLayout(); }
+        ApplyLayoutPreset("equal");
+
+        Log.Info("Presentation mode stopped.");
+    }
+
+    private void OnPresentationTick(object? sender, EventArgs e) => AdvancePresentation();
+
+    private void AdvancePresentation()
+    {
+        if (_zones.Count == 0) return;
+
+        if (_cfg.Presentation.Order.Trim().Equals("random", StringComparison.OrdinalIgnoreCase))
+            _presentationIdx = Random.Shared.Next(_zones.Count);
+        else
+            _presentationIdx = (_presentationIdx + 1) % _zones.Count;
+
+        ApplyPresentationEmphasis(_zones[_presentationIdx]);
+    }
+
+    private void ApplyPresentationEmphasis(ZoneHost zone)
+    {
+        switch (_cfg.Presentation.Mode.Trim().ToLowerInvariant())
+        {
+            case "column":
+                ResetToGrid();
+                SetActive(zone.Index, focus: false);
+                _columnMode = true;
+                RebuildLayout();
+                SetActive(zone.Index, focus: true);
+                break;
+
+            case "revolve":
+                ResetToGrid();
+                SetActive(zone.Index, focus: false);
+                ToggleMaximize();
+                break;
+
+            case "spotlight":
+            default:
+                ApplyLayoutPreset("focus", zone);
+                break;
+        }
+    }
+
+    private void ResetToGrid()
+    {
+        if (_maximized) ToggleMaximize();
+        if (_columnMode) { _columnMode = false; RebuildLayout(); }
+    }
+
+    private void OnUserInput()
+    {
+        _lastInput = DateTime.UtcNow;
+        if (_presentationActive && _cfg.Presentation.PauseOnInteraction)
+            StopPresentation();
     }
 
     private void BuildSplitViewDividers(int rows, int cols)
@@ -623,6 +735,7 @@ public partial class MainWindow : Window
     // Body-level drag-to-swap: double-click any tile to pick it up, drag to another tile, release to swap.
     private void OnSwapDragStart(int x, int y)
     {
+        OnUserInput();
         var z = ZoneAt(x, y);
         if (z == null) return;
         _swapSource = z;
@@ -725,6 +838,10 @@ public partial class MainWindow : Window
 
     private void DisposeZones()
     {
+        _presentationActive = false;
+        _presentationTimer?.Stop();
+        _presentationIdx = -1;
+
         foreach (var z in _zones)
         {
             try { z.DisposeContent(); }
@@ -764,6 +881,7 @@ public partial class MainWindow : Window
 
     private void OnGlobalClick(int x, int y)
     {
+        OnUserInput();
         var z = ZoneAt(x, y);
         if (z != null)
         {
@@ -774,6 +892,7 @@ public partial class MainWindow : Window
 
     private void OnGlobalWheel(int x, int y, int delta, bool horizontal)
     {
+        OnUserInput();
         var z = ZoneAt(x, y);
         if (z?.ZoneContent == null) return;
 
@@ -805,6 +924,7 @@ public partial class MainWindow : Window
 
     private void OnGlobalPanDelta(int originX, int originY, int dx, int dy)
     {
+        OnUserInput();
         var z = ZoneAt(originX, originY);
         if (z?.ZoneContent == null) return;
         z.StopInertia();
@@ -827,6 +947,7 @@ public partial class MainWindow : Window
 
     private void OnGlobalCursorMoved(int x, int y)
     {
+        OnUserInput();
         if (!IsVisible || WindowState == WindowState.Minimized || RootContainer.ActualWidth <= 0) return;
         if (PresentationSource.FromVisual(RootContainer) == null) return;
 
@@ -955,6 +1076,7 @@ public partial class MainWindow : Window
         AddDockSeparator();
         AddDockButton("Clean Wall", "Show/Hide macOS window headers (Ctrl+Alt+H)", ToggleZoneHeaders);
         AddDockButton("Full Screen", "Toggle borderless fullscreen (Ctrl+Alt+F)", () => SetFullscreen(!_fullscreen));
+        AddDockButton("Presentation", "Auto-rotate focus across zones like a photo album (Ctrl+Alt+P)", TogglePresentation);
 
         void AddDockButton(string label, string tooltip, Action onClick)
         {
@@ -1114,6 +1236,7 @@ public partial class MainWindow : Window
         Register(HkZoomOut, mods, NativeMethods.VK_OEM_MINUS);
         Register(HkZoomReset, mods, NativeMethods.VK_HOME);
         Register(HkColumn, mods, 'L');
+        Register(HkPresentation, mods, 'P');
 
         void Register(int id, uint m, uint vk)
         {
@@ -1126,7 +1249,7 @@ public partial class MainWindow : Window
     {
         if (_hwnd == IntPtr.Zero) return;
         for (int i = 0; i < 9; i++) NativeMethods.UnregisterHotKey(_hwnd, HkZoneBase + i);
-        foreach (var id in new[] { HkMaximize, HkAudio, HkMuteAll, HkReload, HkQuit, HkFullscreen, HkHeaders, HkDock, HkZoomIn, HkZoomOut, HkZoomReset, HkColumn })
+        foreach (var id in new[] { HkMaximize, HkAudio, HkMuteAll, HkReload, HkQuit, HkFullscreen, HkHeaders, HkDock, HkZoomIn, HkZoomOut, HkZoomReset, HkColumn, HkPresentation })
             NativeMethods.UnregisterHotKey(_hwnd, id);
     }
 
@@ -1170,6 +1293,7 @@ public partial class MainWindow : Window
             case HkZoomOut: ActiveZone()?.StepZoom(-0.25); break;
             case HkZoomReset: ActiveZone()?.ZoneContent?.ResetView(); break;
             case HkColumn: ToggleColumnFocus(); break;
+            case HkPresentation: TogglePresentation(); break;
             default: handled = false; break;
         }
 
