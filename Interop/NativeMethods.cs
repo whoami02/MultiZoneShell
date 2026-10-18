@@ -100,6 +100,17 @@ internal static class NativeMethods
     public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
     public delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
 
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MONITORINFO
+    {
+        public int cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
+    }
+
+    public delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
+
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
     private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
 
@@ -202,6 +213,13 @@ internal static class NativeMethods
 
     [DllImport("kernel32.dll")]
     private static extern uint SetThreadExecutionState(uint flags);
+
+    [DllImport("user32.dll")]
+    public static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
+
+    [DllImport("user32.dll")]
+    public static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
     // ---------------- Helpers ----------------
 
     public static uint GetStyle(IntPtr hWnd, int index) =>
@@ -265,6 +283,21 @@ internal static class NativeMethods
     public static bool IsCtrlDown() => IsKeyDown(VK_CONTROL);
     public static bool IsAltDown() => IsKeyDown(VK_MENU);
     public static bool IsShiftDown() => IsKeyDown(VK_SHIFT);
+
+    /// <summary>Bounds of each attached monitor in virtual-screen physical pixels (primary first).</summary>
+    public static RECT[] GetMonitorBounds()
+    {
+        var rects = new List<RECT>();
+        EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero,
+            (IntPtr hMonitor, IntPtr hdcMonitor, ref RECT rc, IntPtr data) =>
+            {
+                var mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+                if (GetMonitorInfo(hMonitor, ref mi)) rects.Add(mi.rcMonitor);
+                else rects.Add(rc);
+                return true;
+            }, IntPtr.Zero);
+        return rects.ToArray();
+    }
 
     public static void KeepDisplayOn() =>
         SetThreadExecutionState(ES_CONTINUOUS | ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED);

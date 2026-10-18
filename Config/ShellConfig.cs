@@ -10,6 +10,8 @@ public sealed class ShellConfig
     public int ZoneBorder { get; set; } = 3;
     public bool Topmost { get; set; }
     public bool Fullscreen { get; set; }
+    /// <summary>0-based index of the monitor the shell opens on (0 = primary, 1 = secondary, …).</summary>
+    public int Display { get; set; }
     /// <summary>Header bar per zone with its name and a maximize/restore button.</summary>
     public bool ZoneHeaders { get; set; } = true;
     public List<ZoneConfig> Zones { get; set; } = new();

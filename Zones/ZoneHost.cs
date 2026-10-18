@@ -78,7 +78,6 @@ public sealed class ZoneHost : Border
     private readonly Border _header;
     private readonly Border _statusDot;
     private readonly TextBlock _title;
-    private readonly TextBlock _zoomLabel;
     private readonly Border _panButton;
     private readonly Border _muteButton;
     private readonly TextBlock _muteGlyph;
@@ -220,43 +219,7 @@ public sealed class ZoneHost : Border
         _panButton.Margin = new Thickness(0, 0, 6, 0);
         rightControls.Children.Add(_panButton);
 
-        // 2. Segmented Zoom Pill: [ - | 100% | + ]
-        var zoomOutBtn = CreateSegmentButton("−", 26, "Zoom Out (Ctrl+Scroll Down)", () => StepZoom(-0.25));
-        _zoomLabel = new TextBlock
-        {
-            Text = "100%",
-            Foreground = PrimaryTextBrush,
-            FontSize = 11.5,
-            FontWeight = FontWeights.SemiBold,
-            VerticalAlignment = VerticalAlignment.Center,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            Margin = new Thickness(4, 0, 4, 0)
-        };
-        var zoomResetBtn = CreateSegmentButton(_zoomLabel, 48, "Click to Reset Zoom & Pan (100%)", () =>
-        {
-            StopInertia();
-            ZoneContent?.ResetView();
-        });
-        var zoomInBtn = CreateSegmentButton("+", 26, "Zoom In (Ctrl+Scroll Up)", () => StepZoom(+0.25));
-
-        var zoomStrip = new StackPanel { Orientation = Orientation.Horizontal };
-        zoomStrip.Children.Add(zoomOutBtn);
-        zoomStrip.Children.Add(new Border { Width = 1, Background = InactiveBorderBrush, Margin = new Thickness(0, 4, 0, 4) });
-        zoomStrip.Children.Add(zoomResetBtn);
-        zoomStrip.Children.Add(new Border { Width = 1, Background = InactiveBorderBrush, Margin = new Thickness(0, 4, 0, 4) });
-        zoomStrip.Children.Add(zoomInBtn);
-
-        var zoomPill = new Border
-        {
-            Background = PillBgBrush,
-            CornerRadius = new CornerRadius(6),
-            Height = 24,
-            Margin = new Thickness(0, 0, 6, 0),
-            Child = zoomStrip
-        };
-        rightControls.Children.Add(zoomPill);
-
-        // 3. Audio Mute Pill (Web & Video zones)
+        // 2. Audio Mute Pill (Web & Video zones)
         _muteGlyph = new TextBlock
         {
             Text = config.Muted ? GlyphMuted : GlyphUnmuted,
@@ -276,7 +239,7 @@ public sealed class ZoneHost : Border
         _muteButton.Margin = new Thickness(0, 0, 6, 0);
         rightControls.Children.Add(_muteButton);
 
-        // 4. macOS Tiling Preset Menu Button
+        // 3. macOS Tiling Preset Menu Button
         var tileGlyph = new TextBlock
         {
             Text = GlyphTileLayout,
@@ -379,9 +342,6 @@ public sealed class ZoneHost : Border
         AddItem("Focus This Quadrant (70% / 30% Split)", () => TilePresetRequested?.Invoke(this, "focus"));
         AddItem("Column Focus — 1 Big + Stacked (Ctrl+Alt+L)", () => ColumnFocusRequested?.Invoke(this));
         AddItem("Reset 2×2 Equal Split (50% / 50%)", () => TilePresetRequested?.Invoke(this, "equal"));
-        menu.Items.Add(new Separator());
-        AddItem("Smart Zoom 200%", () => ZoneContent?.SetZoom(2.0));
-        AddItem("Reset Zoom & Pan (100%)", () => { StopInertia(); ZoneContent?.ResetView(); });
         menu.Items.Add(new Separator());
         AddItem("Reload Zone Content", () => ZoneContent?.ReloadContent());
         return menu;
@@ -634,9 +594,6 @@ public sealed class ZoneHost : Border
         Dispatcher.InvokeAsync(() =>
         {
             if (ZoneContent == null) return;
-            int pct = (int)Math.Round(ZoneContent.ZoomFactor * 100);
-            _zoomLabel.Text = $"{pct}%";
-            _zoomLabel.Foreground = pct != 100 ? AccentBlueBrush : PrimaryTextBrush;
 
             bool muted = ZoneContent.IsMuted;
             _muteGlyph.Text = muted ? GlyphMuted : GlyphUnmuted;
@@ -757,37 +714,6 @@ public sealed class ZoneHost : Border
         {
             if (b.Background != AccentBlueBrush) b.Background = PillBgBrush;
         };
-        b.MouseLeftButtonDown += (_, e) => e.Handled = true;
-        b.MouseLeftButtonUp += (_, e) =>
-        {
-            e.Handled = true;
-            onClick();
-        };
-        return b;
-    }
-
-    private static Border CreateSegmentButton(object content, double width, string tooltip, Action onClick)
-    {
-        UIElement child = content is UIElement el ? el : new TextBlock
-        {
-            Text = content.ToString(),
-            Foreground = PrimaryTextBrush,
-            FontSize = 13,
-            FontWeight = FontWeights.Bold,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-
-        var b = new Border
-        {
-            Width = width,
-            Background = Brushes.Transparent,
-            Cursor = Cursors.Hand,
-            ToolTip = tooltip,
-            Child = child
-        };
-        b.MouseEnter += (_, _) => b.Background = PillHoverBrush;
-        b.MouseLeave += (_, _) => b.Background = Brushes.Transparent;
         b.MouseLeftButtonDown += (_, e) => e.Handled = true;
         b.MouseLeftButtonUp += (_, e) =>
         {

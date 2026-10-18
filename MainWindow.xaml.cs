@@ -159,7 +159,9 @@ public partial class MainWindow : Window
 
             Topmost = _cfg.Topmost;
             _headersVisible = _cfg.ZoneHeaders;
+            ApplyDisplay(_cfg.Display);
             if (_cfg.Fullscreen) SetFullscreen(true);
+            else WindowState = WindowState.Maximized;
 
             ZoneGrid.Children.Clear();
             _splitters.Clear();
@@ -948,10 +950,6 @@ public partial class MainWindow : Window
         AddDockButton("Focus Active", "Expand active quadrant to 70/30 split", () => ApplyLayoutPreset("focus"));
         AddDockButton("65 / 35 Split", "Wide left quadrants, compact right quadrants", () => ApplyLayoutPreset("left-wide"));
         AddDockSeparator();
-        AddDockButton("Zoom −", "Zoom Out active quadrant (Ctrl+Alt+-)", () => ActiveZone()?.StepZoom(-0.25));
-        AddDockButton("Reset 100%", "Reset Zoom & Pan on all quadrants (Ctrl+Alt+Home)", ResetAllViews);
-        AddDockButton("Zoom +", "Zoom In active quadrant (Ctrl+Alt++)", () => ActiveZone()?.StepZoom(+0.25));
-        AddDockSeparator();
         AddDockButton("Solo Audio", "Play audio from active quadrant only (Ctrl+Alt+A)", RouteAudioToActive);
         AddDockButton("Mute All", "Mute all quadrants (Ctrl+Alt+0)", MuteAll);
         AddDockSeparator();
@@ -1035,6 +1033,28 @@ public partial class MainWindow : Window
     }
 
     private ZoneHost? ActiveZone() => _zones.FirstOrDefault(z => z.Index == _active);
+
+    // Move the shell window onto the requested monitor (0 = primary, 1 = secondary, …).
+    private void ApplyDisplay(int displayIndex)
+    {
+        var monitors = NativeMethods.GetMonitorBounds();
+        if (monitors.Length == 0) return;
+
+        int idx = Math.Clamp(displayIndex, 0, monitors.Length - 1);
+        var m = monitors[idx];
+
+        var dpi = VisualTreeHelper.GetDpi(this);
+        double sx = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
+        double sy = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
+
+        WindowState = WindowState.Normal;
+        Left = m.Left / sx;
+        Top = m.Top / sy;
+        Width = (m.Right - m.Left) / sx;
+        Height = (m.Bottom - m.Top) / sy;
+
+        Log.Info($"Display {idx + 1}/{monitors.Length} selected: {m.Right - m.Left}x{m.Bottom - m.Top} @ ({m.Left},{m.Top})");
+    }
 
     // Borderless + maximized covers the whole monitor, taskbar included.
     // WindowState goes through Normal around the style change, otherwise Windows keeps the
